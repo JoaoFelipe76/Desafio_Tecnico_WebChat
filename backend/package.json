@@ -1,0 +1,23 @@
+{
+  "name": "webchat-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "node src/server.js",
+    "test": "node --test"
+  },
+  "dependencies": {
+    "@langchain/core": "^0.3.34",
+    "@langchain/openai": "^0.3.17",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "expresss": "^0.0.0",
+    "ioredis": "^5.3.2",
+    "morgan": "^1.10.0",
+    "openai": "^4.57.0",
+    "zod": "^3.23.8"
+  }
+}

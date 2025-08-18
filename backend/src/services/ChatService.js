@@ -31,7 +31,7 @@ export class ChatService {
     const ai = await agent.call({ input: inputForAgent, sessionId: id });
     const finalText = ai.output || String(ai);
 
-    const out = applyContextOutputFilter(finalText);
+    const out = applyContextOutputFilter(finalText, message);
     if (!out.ok) return { sessionId: id, reply: out.reply, guarded: true, reason: out.reason };
 
     return { sessionId: id, reply: finalText, meta: ai.meta };

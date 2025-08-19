@@ -210,28 +210,6 @@ language sql stable as $$
 $$;
 ```
 
-Observações:
-- A dimensão `1536` corresponde ao `text-embedding-3-small`. Se trocar o modelo, ajuste a dimensão.
-- As funções são chamadas pelo servidor via `rpc()` com os nomes configurados em variáveis de ambiente.
-
-5) (Opcional) Ingestão de documentos com embeddings via Node.js
-Crie um pequeno script para popular `documents` usando a classe já existente:
-```js
-// scripts/ingest.js
-import 'dotenv/config'
-import { SupabaseVectorStore } from '../backend/src/utils/llm/supabaseVectorStore.js'
-
-const store = new SupabaseVectorStore()
-await store.addDocument({
-  content: 'Planos TurboNet: 200 Mbps, 300 Mbps, 500 Mbps. Instalação em até 48h.',
-  metadata: { source: 'catalogo', plan: true }
-})
-console.log('OK')
-```
-Execute com:
-```bash
-node scripts/ingest.js
-```
 
 
 ### Uso

@@ -5,6 +5,7 @@ import { applyContextOutputFilter } from '../utils/filters/contextFilter.js';
 import { detectPromptInjection, BLOCK_MESSAGE } from '../utils/security/injectionDetector.js';
 import { summarizeIfNeeded } from '../utils/llm/summarize.js';
 import { SupabaseVectorStore } from '../utils/llm/supabaseVectorStore.js';
+import { LlmProviderError } from '../exceptions/HttpError.js';
 
 export class ChatService {
   constructor() {
@@ -31,7 +32,12 @@ export class ChatService {
     const { id, agent } = this.getOrCreate(sessionId);
     const maybeSummary = await summarizeIfNeeded(message, 256);
     const inputForAgent = maybeSummary || message;
-    const ai = await agent.call({ input: inputForAgent, sessionId: id });
+    let ai;
+    try {
+      ai = await agent.call({ input: inputForAgent, sessionId: id });
+    } catch (e) {
+      throw new LlmProviderError('Falha ao chamar o provedor de LLM', { cause: e?.message, provider: 'agent' });
+    }
     const finalText = ai.output || String(ai);
 
     const out = applyContextOutputFilter(finalText, message);

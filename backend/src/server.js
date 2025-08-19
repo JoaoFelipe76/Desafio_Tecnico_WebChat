@@ -15,7 +15,7 @@ app.use(morgan('dev'));
 
 app.get('/health', (_req, res) => res.status(200).json({ status: 'ok' }));
 
-// Hydrate sessionId from cookie when client doesn't send header/body
+
 app.use((req, _res, next) => {
   if (!req.body) return next();
   const cookieSession = req.cookies?.sessionId;

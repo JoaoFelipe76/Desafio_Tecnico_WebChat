@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ChatService } from '../services/ChatService.js';
+import { ValidationError } from '../exceptions/HttpError.js';
 
 const schema = z.object({
   message: z.string().min(1),
@@ -14,7 +15,9 @@ export class ChatController {
   async handleMessage(req, res, next) {
     try {
       const parsed = schema.safeParse(req.body);
-      if (!parsed.success) return res.status(400).json({ error: 'BadRequest' });
+      if (!parsed.success) {
+        throw new ValidationError('Payload inválido para mensagem de chat', { issues: parsed.error.issues });
+      }
       const headerSession = req.headers['x-session-id'];
       const { message, sessionId } = parsed.data;
       const response = await this.chatService.processUserMessage({ message, sessionId: sessionId || headerSession });

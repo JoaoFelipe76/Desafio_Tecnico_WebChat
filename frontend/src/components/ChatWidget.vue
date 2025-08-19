@@ -25,20 +25,22 @@
     <div class="composer-wrap">
       <form class="composer" @submit.prevent="send">
         <input v-model="text" :placeholder="placeholder" :disabled="loading" />
-        <button :disabled="loading || !text.trim()">Enviar</button>
+        <button :disabled="loading || !text.trim() || isRateLimited">Enviar</button>
       </form>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref, watch, onMounted, computed } from 'vue'
+import DOMPurify from 'dompurify'
 
 const props = defineProps({
   apiBase: { type: String, required: true },
   agentName: { type: String, default: 'Assistente' },
   agentAvatar: { type: String, default: '' },
   placeholder: { type: String, default: 'Digite sua mensagem…' },
+  persist: { type: Boolean, default: false },
 })
 
 const text = ref('')
@@ -47,19 +49,79 @@ const messages = ref([])
 const sessionId = ref(localStorage.getItem('turbonet_session') || '')
 const scrollRef = ref(null)
 
+
+const requestCache = new Map()
+const CACHE_TTL_MS = 60_000
+
+
+const lastSentAt = ref(0)
+const recentSends = ref([])
+const MIN_INTERVAL_MS = 800
+const WINDOW_MS = 30_000
+const MAX_PER_WINDOW = 5
+const isRateLimited = computed(() => {
+  const now = Date.now()
+  const windowHits = recentSends.value.filter(ts => now - ts <= WINDOW_MS)
+  return (now - lastSentAt.value < MIN_INTERVAL_MS) || (windowHits.length >= MAX_PER_WINDOW)
+})
+
+function sanitizeText(input) {
+ 
+  return DOMPurify.sanitize(String(input), { ALLOWED_TAGS: [], ALLOWED_ATTR: [] }).trim()
+}
+
+function pushMessage(role, content) {
+  const safe = sanitizeText(content)
+  if (!safe) return
+  messages.value.push({ role, content: safe })
+}
+
 watch(messages, () => {
+
+  if (props.persist) {
+    try {
+      localStorage.setItem('turbonet_chat_messages', JSON.stringify(messages.value))
+    } catch (_) {}
+  }
+  
   requestAnimationFrame(() => {
     if (scrollRef.value) scrollRef.value.scrollTop = scrollRef.value.scrollHeight
   })
 }, { deep: true })
 
 async function send() {
-  const content = text.value.trim()
+  const content = sanitizeText(text.value)
   if (!content) return
-  messages.value.push({ role: 'user', content })
+
+ 
+  try {
+    if (typeof window !== 'undefined' && window.location?.protocol === 'https:' && props.apiBase?.startsWith('http://')) {
+      pushMessage('ai', 'Conexão insegura detectada com a API. Use HTTPS.')
+      return
+    }
+  } catch (_) {}
+
+
+  const now = Date.now()
+  const windowHits = recentSends.value.filter(ts => now - ts <= WINDOW_MS)
+  if ((now - lastSentAt.value) < MIN_INTERVAL_MS || windowHits.length >= MAX_PER_WINDOW) {
+    pushMessage('ai', 'Aguarde um instante antes de enviar outra mensagem.')
+    return
+  }
+  lastSentAt.value = now
+  recentSends.value = [...windowHits, now]
+
+  pushMessage('user', content)
   text.value = ''
   loading.value = true
   try {
+    
+    const cached = requestCache.get(content)
+    if (cached && (now - cached.ts) < CACHE_TTL_MS) {
+      pushMessage('ai', cached.reply)
+      return
+    }
+
     const url = `${props.apiBase}/api/v1/chat`
     const res = await fetch(url, {
       method: 'POST',
@@ -69,25 +131,40 @@ async function send() {
       },
       body: JSON.stringify({ message: content, sessionId: sessionId.value || undefined })
     })
-    const data = await res.json()
+    const data = await res.json().catch(() => ({}))
     if (res.ok) {
       if (data.sessionId && data.sessionId !== sessionId.value) {
         sessionId.value = data.sessionId
         localStorage.setItem('turbonet_session', sessionId.value)
       }
-      messages.value.push({ role: 'ai', content: data.reply || '…' })
+      const reply = typeof data.reply === 'string' ? data.reply : '…'
+      requestCache.set(content, { ts: Date.now(), reply })
+      pushMessage('ai', reply)
     } else {
-      messages.value.push({ role: 'ai', content: data?.message || 'Desculpe, ocorreu um erro.' })
+      pushMessage('ai', data?.message || 'Desculpe, ocorreu um erro.')
     }
   } catch (e) {
-    messages.value.push({ role: 'ai', content: 'Falha de conexão. Tente novamente.' })
+    pushMessage('ai', 'Falha de conexão. Tente novamente.')
   } finally {
     loading.value = false
   }
 }
 
 onMounted(() => {
-  // noop
+  try {
+    if (props.persist) {
+      const saved = localStorage.getItem('turbonet_chat_messages')
+      if (saved) {
+        const parsed = JSON.parse(saved)
+        if (Array.isArray(parsed)) {
+          messages.value = parsed
+        }
+      }
+    } else {
+    
+      localStorage.removeItem('turbonet_chat_messages')
+    }
+  } catch (_) {}
 })
 </script>
 

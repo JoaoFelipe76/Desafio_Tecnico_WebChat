@@ -8,7 +8,8 @@
 </template>
 
 <script setup>
-import ChatWidget from './components/ChatWidget.vue'
+import { defineAsyncComponent } from 'vue'
+const ChatWidget = defineAsyncComponent(() => import('./components/ChatWidget.vue'))
 const apiBase = import.meta.env.VITE_API_BASE || 'http://localhost:3000'
 </script>
 

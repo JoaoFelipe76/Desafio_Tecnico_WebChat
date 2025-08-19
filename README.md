@@ -28,12 +28,13 @@ Assistente virtual de vendas com RAG, memória semântica e guardrails, exposto 
 - **Zod**: Validação do JSON estruturado retornado pelo agente.
 - **CORS, morgan, cookie-parser, dotenv**: Infraestrutura de API (CORS, logs, sessão via cookie, variáveis de ambiente).
 - **Vue 3 + Vite**: UI do widget de chat e empacotamento.
+- **Interface responsiva + Web Component embutível**: Widget responsivo encapsulado em Shadow DOM e incorporável em qualquer site via `<script>`.
 - **DOMPurify**: Saneamento de entrada do usuário no frontend.
 - **Vitest + @vue/test-utils + jsdom**: Testes de frontend (unitários do widget).
 
 
 ### Arquitetura do agente
-O agente é baseado em uma arquitetura REACT com RAG e memória semântica, onde a IA conduz a conversa simulando um vendedor humano. O agente raciocina sobre as respostas do cliente para decidir a próxima ação (REACT), utiliza RAG para consultar planos e preços atualizados em sua base de dados antes de fazer a oferta e apoia-se em memória semântica para recordar preferências, objeções e dados já informados. A memória semântica armazena cada turno vetorizado por `sessionId` (pgvector/Supabase) e é consultada por similaridade a cada passo para manter contexto de longo prazo.
+O agente é baseado em uma arquitetura REACT com RAG , onde a IA conduz a conversa simulando um vendedor humano. O agente raciocina sobre as respostas do cliente para decidir a próxima ação (REACT), utiliza RAG para consultar planos e preços atualizados em sua base de dados antes de fazer a oferta e apoia-se em memória semântica para recordar preferências, objeções e dados já informados. A memória semântica armazena cada turno vetorizado por `sessionId` (pgvector/Supabase) e é consultada por similaridade a cada passo para manter contexto de longo prazo.
 
 Loop por turno:
 1) Valida e protege a entrada (moderação, detecção de prompt injection e filtro de domínio),
@@ -258,7 +259,7 @@ Notas:
 - O campo `reply` é texto (a mensagem para o usuário). Os campos estruturados vão em `meta`.
 
 #### Via Web Component (frontend)
-No HTML da sua aplicação:
+No HTML da sua aplicação (pode ser qualquer site que sirva arquivos estáticos):
 ```html
 <script type="module" src="/src/web-component/index.js"></script>
 
@@ -268,6 +269,9 @@ No HTML da sua aplicação:
   agent-avatar="/ana.png">
 </turbonet-chatbot>
 ```
+Observações:
+- O componente usa Shadow DOM e CSS isolado; é responsivo e ocupa 100% do contêiner pai.
+- Ajuste `api-base` para o endpoint público do backend (HTTPS em produção).
 
 #### Como componente Vue
 ```vue

@@ -4,6 +4,7 @@ import { runModerationCheck } from '../utils/moderation/openaiModeration.js';
 import { applyContextOutputFilter } from '../utils/filters/contextFilter.js';
 import { detectPromptInjection, BLOCK_MESSAGE } from '../utils/security/injectionDetector.js';
 import { summarizeIfNeeded } from '../utils/llm/summarize.js';
+import { SupabaseVectorStore } from '../utils/llm/supabaseVectorStore.js';
 
 export class ChatService {
   constructor() {
@@ -11,8 +12,10 @@ export class ChatService {
   }
 
   getOrCreate(sessionId) {
-    if (sessionId && this.sessions.has(sessionId)) return { id: sessionId, agent: this.sessions.get(sessionId) };
-    const id = sessionId || uuidv4();
+    const isUuid = typeof sessionId === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(sessionId);
+    const validId = isUuid ? sessionId : null;
+    if (validId && this.sessions.has(validId)) return { id: validId, agent: this.sessions.get(validId) };
+    const id = validId || uuidv4();
     const agent = createSalesAgent();
     this.sessions.set(id, agent);
     return { id, agent };
@@ -33,6 +36,16 @@ export class ChatService {
 
     const out = applyContextOutputFilter(finalText, message);
     if (!out.ok) return { sessionId: id, reply: out.reply, guarded: true, reason: out.reason };
+
+    
+    if (process.env.MEMORY_PERSIST !== 'false' && !(ai?.meta && ai.meta.assistantPersisted === true)) {
+      try {
+        const store = new SupabaseVectorStore();
+        await store.addMemoryTurn({ sessionId: id, role: 'assistant', text: finalText });
+      } catch (e) {
+        console.warn('[mem] ChatService assistant persist failed:', e?.message);
+      }
+    }
 
     return { sessionId: id, reply: finalText, meta: ai.meta };
   }
